@@ -28,55 +28,55 @@ namespace jar {
  */
 class any {
 
-#define TYPE_DIFF(type1, type2) typename = typename std::enable_if<!std::is_same<type1, type2>::value>::type
-#define TYPE_SAME(type1, type2) typename = typename std::enable_if<std::is_same<type1, type2>::value>::type
-
     using func = std::function<void()>;
 
 public:
-    any()               { this->set(0); }
-    any(const any  & a) { this->set(std::forward<const any>(a)); }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    any(const _Tp  & v) { this->set(std::forward<const _Tp>(v)); }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    any(      _Tp && v) { this->set(std::forward<      _Tp>(v)); }
-    ~any()              { this->del(); }
+    any()               { this->set_val(0); }
+    any(const any  & a) { this->set_any(std::forward<const any>(a)); }
+    any(      any  & a) { this->set_any(std::forward<      any>(a)); }
+    any(      any && a) { this->set_any(std::forward<      any>(a)); }
+    template <typename _Tp>
+    any(const _Tp  & v) { this->set_val(std::forward<const _Tp>(v)); }
+    template <typename _Tp>
+    any(      _Tp && v) { this->set_val(std::forward<      _Tp>(v)); }
+    ~any()              { this->d(); }
     
-    any & operator=(const any  & a) { this->set(std::forward<const any>(a)); return *this; }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    any & operator=(const _Tp  & v) { this->set(std::forward<const _Tp>(v)); return *this; }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    any & operator=(      _Tp && v) { this->set(std::forward<      _Tp>(v)); return *this; }
+    any & operator=(const any  & a) { this->set_any(std::forward<const any>(a)); return *this; }
+    template <typename _Tp>
+    any & operator=(const _Tp  & v) { this->set_val(std::forward<const _Tp>(v)); return *this; }
+    template <typename _Tp>
+    any & operator=(      _Tp && v) { this->set_val(std::forward<      _Tp>(v)); return *this; }
 
     template <typename _Tp>
-    _Tp & cast() { return * (_Tp *) this->v; }
+           _Tp & cast() const { return * (_Tp *) this->v; }
+    const char * type() const { return this->t; }
 
 private:
-    void set(const any & a) {
-        this->t     = a.t;
-        this->v     = a.v;
-        this->del   = a.del;
+    void set_any(const any & a) {
+        this->t = a.t;
+        this->v = a.v;
+        this->d = a.d;
 
         auto a0 = const_cast<any *>(&a);
-        a0->del = [] { };
+        a0->d = [] { };
     }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    void set(const _Tp & v) {
-        this->t     = typeid(v).name();
-        this->v     = (void *) std::addressof(v);
-        this->del   = [] { };
+    template <typename _Tp>
+    void set_val(const _Tp & v) {
+        this->t = typeid(v).name();
+        this->v = (void *) std::addressof(v);
+        this->d = [] { };
     }
-    template <typename _Tp, TYPE_DIFF(_Tp, any)>
-    void set(_Tp && v) {
-        this->t     = typeid(v).name();
-        auto p      = new _Tp(v);
-        this->v     = (void *) p;
-        this->del   = [p] { delete p; };
+    template <typename _Tp>
+    void set_val(_Tp && v) {
+        this->t = typeid(v).name();
+        auto p = new _Tp(v);
+        this->v = (void *) p;
+        this->d = [p] { delete p; };
     }
 
-    const char * t;
-          void * v;
-          func   del;
+    const char * t; // type
+          void * v; // value
+          func   d; // delete
 };
 
 

@@ -1,17 +1,17 @@
 
 #include "any.h"
 #include "exec.h"
+#include "event.h"
 
-#include <string>
 #include <iostream>
 
 void test_any() {
     jar::any a1 = 3;
     jar::any a2 = 3.3f;
     jar::any a3 = std::string("3.3.3");
-    std::cout << jar::now2str() << " - " << a1.cast<int>() << std::endl;
-    std::cout << jar::now2str() << " - " << a2.cast<float>() << std::endl;
-    std::cout << jar::now2str() << " - " << a3.cast<std::string>() << std::endl;
+    std::cout << jar::now2str() << " - " << "any int: " << a1.cast<int>() << std::endl;
+    std::cout << jar::now2str() << " - " << "any float: " << a2.cast<float>() << std::endl;
+    std::cout << jar::now2str() << " - " << "any string: " << a3.cast<std::string>() << std::endl;
 }
 
 void test_exec() {
@@ -88,10 +88,28 @@ void test_pool() {
     }
 }
 
+void test_event() {
+    jar::event_queue<uint32_t>      queue_int;
+    jar::event_queue<std::string>   queue_str;
+
+    queue_int.sub(0x00000001, (jar::func_v<std::string>) [] (std::string str) {
+        std::cout << jar::now2str() << " - " << "int event_queue: " << str << std::endl;
+    });
+    queue_str.sub("0x00000001", (jar::func_v<std::string>) [] (std::string str) {
+        std::cout << jar::now2str() << " - " << "string event_queue: " << str << std::endl;
+    });
+
+    queue_int.pub(0x00000001, std::string("Hello World!"));
+    queue_str.pub("0x00000001", std::string("Hello World!"));
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+}
+
 int main() {
     test_any();
     test_exec();
     test_pool();
+    test_event();
 
     std::cout << "Hello World!" << std::endl;
 
