@@ -16,34 +16,6 @@ void test_any() {
 
 void test_exec() {
     {
-        std::promise<void> p;
-        jar::async(p, (jar::func_vv) [] {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        });
-        p.get_future().wait();
-        std::cout << jar::now2str() << " - " << "async func_vv " << std::endl;
-    }
-    {
-        std::promise<float> p;
-        jar::async(p, (jar::func<float(void)>) [] () -> float {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            return 3.3;
-        });
-        float c = p.get_future().get();
-        std::cout << jar::now2str() << " - " << "async func<float(void)>: " << c << std::endl;
-    }
-    {
-        float a = 3.3;
-        float b = 3.3;
-        std::promise<float> p;
-        jar::async(p, (jar::func<float(float, float)>) [] (float a, float b) -> float {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            return a * b;
-        }, a, b);
-        float c = p.get_future().get();
-        std::cout << jar::now2str() << " - " << "async func<float(float, float)>: " << c << std::endl;
-    }
-    {
         jar::queuer e;
         e.start();
         e.submit((jar::func_vv) [] {
@@ -117,6 +89,76 @@ void test_pool() {
     }
 }
 
+void test_main_pool() {
+    {
+        std::promise<void> p;
+        jar::async(p, (jar::func_vv) [] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        });
+        p.get_future().wait();
+        std::cout << jar::now2str() << " - " << "async func_vv " << std::endl;
+    }
+    {
+        std::promise<float> p;
+        jar::async(p, (jar::func<float(void)>) [] () -> float {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            return 3.3;
+        });
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "async func<float(void)>: " << c << std::endl;
+    }
+    {
+        float a = 3.3;
+        float b = 3.3;
+        std::promise<float> p;
+        jar::async(p, (jar::func<float(float, float)>) [] (float a, float b) -> float {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            return a * b;
+        }, a, b);
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "async func<float(float, float)>: " << c << std::endl;
+    }
+    {
+        std::promise<void> p;
+        jar::delay(p, std::chrono::milliseconds(500), (jar::func_vv) [] {
+            std::cout << jar::now2str() << " - " << "delay func_vv " << std::endl;
+        });
+        p.get_future().wait();
+    }
+    {
+        std::promise<float> p;
+        jar::delay(p, std::chrono::milliseconds(500), (jar::func<float(void)>) [] () -> float {
+            return 3.3;
+        });
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "delay func<float(void)>: " << c << std::endl;
+    }
+    {
+        float a = 3.3;
+        float b = 3.3;
+        std::promise<float> p;
+        jar::delay(p, std::chrono::milliseconds(500), (jar::func<float(float, float)>) [] (float a, float b) -> float {
+            return a * b;
+        }, a, b);
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "delay func<float(float, float)>: " << c << std::endl;
+    }
+    {
+        auto e = jar::loop(std::chrono::milliseconds(500), (jar::func_vv) [] {
+            std::cout << jar::now2str() << " - " << "loop func_vv" << std::endl;
+        });
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        delete e;
+    }
+    {
+        auto e = jar::anim(3.3f, (jar::func_vv) [] {
+            std::cout << jar::now2str() << " - " << "anim func_vv" << std::endl;
+        });
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        delete e;
+    }
+}
+
 void test_event() {
     {
         jar::event_queue<uint32_t>      queue_int;
@@ -144,10 +186,11 @@ void test_event() {
 }
 
 int main() {
-    test_any();
-    test_exec();
-    test_pool();
-    test_event();
+    // test_any();
+    // test_exec();
+    // test_pool();
+    test_main_pool();
+    // test_event();
 
     std::cout << "Hello World!" << std::endl;
 

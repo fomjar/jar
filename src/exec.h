@@ -13,6 +13,7 @@
 #include <future>
 
 
+
 namespace jar {
 
 
@@ -61,6 +62,7 @@ public:
         tasks(),
         mutex(),
         condition(),
+        name("jar::exec #" + std::to_string(++executor::name_idx)),
         _is_running(false),
         thread(nullptr) { };
     virtual ~executor() { this->stop(); }
@@ -69,6 +71,9 @@ public:
     size_t  size()          const { return this->tasks.size(); }
     bool    is_idle()       const { return this->tasks.empty(); }
 
+    void set_name(const std::string & name) { this->name = name; }
+    std::string get_name() const { return this->name; }
+
     /**
      * @brief 启动线程。
      */
@@ -76,8 +81,8 @@ public:
         if (this->is_running())
             return;
         
+        this->_is_running = true;
         this->thread = new std::thread([this] {
-            this->_is_running = true;
             this->worker()();
             this->_is_running = false;
         });
@@ -90,8 +95,11 @@ public:
         this->_is_running = false;
         this->clear();
         if (this->thread) {
-            this->condition.notify_all();
-            this->thread->join();
+            // 已执行完的线程无法join
+            if (this->thread->joinable()) {
+                this->condition.notify_all();
+                this->thread->join();
+            }
             delete this->thread;
             this->thread = nullptr;
         }
@@ -104,6 +112,15 @@ public:
         JAR_EXEC_LOCK_GUARD
         this->tasks.clear();
         this->tasks.shrink_to_fit();
+    }
+
+    /**
+     * @brief 此线程的join操作。
+     */
+    void join() {
+        if (this->is_running() && this->thread->joinable()) {
+            this->thread->join();
+        }
     }
     
     /**
@@ -154,20 +171,6 @@ public:
         this->tasks.push_back([=] { task(args...); });
         this->condition.notify_all();
     }
-    
-    /**
-     * @brief 提交任务。执行方式和时机取决于实现。
-     * 
-     * @tparam _Ap 
-     * @param task 
-     * @param args 
-     */
-    template <typename ... _Ap>
-    void submit(const func_v<_Ap...> & task, const _Ap & ... args) {
-        JAR_EXEC_LOCK_GUARD
-        this->tasks.push_back([=] { task(args...); });
-        this->condition.notify_all();
-    }
 
 protected:
     virtual func_vv worker() = 0;
@@ -175,10 +178,14 @@ protected:
     std::vector<func_vv>    tasks;
     std::mutex              mutex;
     std::condition_variable condition;
+    std::string             name;
 
 private:
     bool            _is_running;
-    std::thread   * thread;    
+    std::thread   * thread;
+
+private:
+    static uint32_t name_idx;
 
 };
 
@@ -194,7 +201,12 @@ using exec = executor;
  * @author fomjar
  * @date 2022/04/30
  */
-class queuer : public exec { 
+class queuer : public exec {
+
+public:
+    queuer() {
+        this->set_name("jar::queuer #" + std::to_string(++queuer::name_idx));
+    }
 
 protected:
     func_vv worker() override {
@@ -211,6 +223,9 @@ protected:
             }
         };
     }
+
+private:
+    static uint32_t name_idx;
 
 };
 
@@ -229,7 +244,10 @@ class delayer : public exec {
 public:
     template <class _Rep, class _Period>
     delayer(const std::chrono::duration<_Rep, _Period> & duration = std::chrono::seconds(1)) :
-        duration(std::chrono::duration_cast<std::chrono::microseconds>(duration)) { }
+        duration(std::chrono::duration_cast<std::chrono::microseconds>(duration))
+    {
+        this->set_name("jar::delayer #" + std::to_string(++delayer::name_idx));
+    }
 
 public:
     template <class _Rep, class _Period>
@@ -250,6 +268,9 @@ protected:
 private:
     std::chrono::microseconds duration;
 
+private:
+    static uint32_t name_idx;
+
 };
 
 
@@ -267,7 +288,10 @@ class looper : public exec {
 public:
     template <class _Rep, class _Period>
     looper(const std::chrono::duration<_Rep, _Period> & interval = std::chrono::seconds(1)) :
-        interval(std::chrono::duration_cast<std::chrono::microseconds>(interval)) { }
+        interval(std::chrono::duration_cast<std::chrono::microseconds>(interval))
+    {
+        this->set_name("jar::looper #" + std::to_string(++looper::name_idx));
+    }
 
 public:
     template <class _Rep, class _Period>
@@ -290,6 +314,9 @@ protected:
 private:
     std::chrono::microseconds interval;
 
+private:
+    static uint32_t name_idx;
+
 };
 
 
@@ -305,7 +332,9 @@ private:
 class animator : public exec {
 
 public:
-    animator(float frequency = 24.0f) : frequency(frequency) { }
+    animator(float frequency = 24.0f) : frequency(frequency) {
+        this->set_name("jar::animator #" + std::to_string(++animator::name_idx));
+    }
 
 public:
     void set_frequency(float frequency) { this->frequency = frequency; }
@@ -332,6 +361,9 @@ protected:
 
 private:
     float frequency;
+
+private:
+    static uint32_t name_idx;
 
 };
 
@@ -454,21 +486,6 @@ public:
             std::forward<const _Ap>(args)...
         );
     }
-    
-    /**
-     * @brief 提交任务。执行方式和时机取决于实现。
-     * 
-     * @tparam _Ap 
-     * @param task 
-     * @param args 
-     */
-    template <typename ... _Ap>
-    void submit(const func_v<_Ap...> & task, const _Ap & ... args) {
-        this->choose()->submit(
-            std::forward<const func_v<_Ap...>>(task),
-            std::forward<const _Ap>(args)...
-        );
-    }
 
 protected:
     virtual exec * choose() = 0;
@@ -547,11 +564,11 @@ private:
 };
 
 
-extern queuer main_queuer;
+extern cached_pool main_pool;
 
 
 /**
- * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * @brief 异步执行。
  * 
  * @tparam _Rp 
  * @tparam _Ap 
@@ -564,8 +581,7 @@ extern queuer main_queuer;
  */
 template <typename _Rp, typename ... _Ap>
 inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
-    if (!main_queuer.is_running()) main_queuer.start();
-    return main_queuer.submit(
+    main_pool.submit(
         std::forward<const std::promise<_Rp>>(prom),
         std::forward<const func<_Rp(_Ap...)>>(task),
         std::forward<const _Ap>(args)...
@@ -573,7 +589,7 @@ inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task
 }
 
 /**
- * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * @brief 异步执行。
  * 
  * @tparam _Ap 
  * @param prom 
@@ -585,8 +601,7 @@ inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task
  */
 template <typename ... _Ap>
 inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, const _Ap & ... args) {
-    if (!main_queuer.is_running()) main_queuer.start();
-    main_queuer.submit(
+    main_pool.submit(
         std::forward<const std::promise<void>>(prom),
         std::forward<const func_v<_Ap...>>(task),
         std::forward<const _Ap>(args)...
@@ -594,7 +609,7 @@ inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, 
 }
 
 /**
- * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * @brief 异步执行。
  * 
  * @tparam _Rp 
  * @tparam _Ap 
@@ -606,32 +621,167 @@ inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, 
  */
 template <typename _Rp, typename ... _Ap>
 inline void async(const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
-    if (!main_queuer.is_running()) main_queuer.start();
-    return main_queuer.submit(
+    main_pool.submit(
         std::forward<const func<_Rp(_Ap...)>>(task),
         std::forward<const _Ap>(args)...
     );
 }
 
 /**
- * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * @brief 延迟执行。
  * 
+ * @tparam _Rep
+ * @tparam _Period
+ * @tparam _Rp 
  * @tparam _Ap 
+ * @param prom 
+ * @param dura
  * @param task 
  * @param args 
  * 
  * @author fomjar
  * @date 2022/05/01
  */
-template <typename ... _Ap>
-inline void async(const func_v<_Ap...> & task, const _Ap & ... args) {
-    if (!main_queuer.is_running()) main_queuer.start();
-    main_queuer.submit(
-        std::forward<const func_v<_Ap...>>(task),
-        std::forward<const _Ap>(args)...
-    );
+template <typename _Rep, typename _Period, typename _Rp, typename ... _Ap>
+inline void delay(
+    const std::promise<_Rp> & prom,
+    const std::chrono::duration<_Rep, _Period> & dura,
+    const func<_Rp(_Ap...)> & task,
+    const               _Ap & ... args
+) {
+    main_pool.submit((func_vv) [&] {
+        delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
+        e.submit(
+            std::forward<const std::promise<_Rp>>(prom),
+            std::forward<const func<_Rp(_Ap...)>>(task),
+            std::forward<const               _Ap>(args)...
+        );
+        e.start();
+        e.join();
+    });
 }
 
+/**
+ * @brief 延迟执行。
+ * 
+ * @tparam _Rep
+ * @tparam _Period
+ * @tparam _Ap 
+ * @param prom 
+ * @param dura
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename _Rep, typename _Period, typename ... _Ap>
+inline void delay(
+    const std::promise<void> & prom,
+    const std::chrono::duration<_Rep, _Period> & dura,
+    const     func_v<_Ap...> & task,
+    const                _Ap & ... args
+) {
+    main_pool.submit((func_vv) [&] {
+        delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
+        e.submit(
+            std::forward<const std::promise<void>>(prom),
+            std::forward<const     func_v<_Ap...>>(task),
+            std::forward<const                _Ap>(args)...
+        );
+        e.start();
+        e.join();
+    });
+}
+
+/**
+ * @brief 延迟执行。
+ * 
+ * @tparam _Rep
+ * @tparam _Period
+ * @tparam _Rp 
+ * @tparam _Ap 
+ * @param dura
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename _Rep, typename _Period, typename _Rp, typename ... _Ap>
+inline void delay(
+    const std::chrono::duration<_Rep, _Period> & dura,
+    const func<_Rp(_Ap...)> & task,
+    const               _Ap & ... args
+) {
+    main_pool.submit((func_vv) [&] () {
+        delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
+        e.submit(
+            std::forward<const func<_Rp(_Ap...)>>(task),
+            std::forward<const               _Ap>(args)...
+        );
+        e.start();
+        e.join();
+    });
+}
+
+/**
+ * @brief 循环执行。
+ * 
+ * @tparam _Rep 
+ * @tparam _Period 
+ * @tparam _Rp 
+ * @tparam _Ap 
+ * @param intv 
+ * @param task 
+ * @param args 
+ * @return looper* 
+ * 
+ * @author fomjar
+ * @date 2022/05/02
+ */
+template <typename _Rep, typename _Period, typename _Rp, typename ... _Ap>
+inline looper * loop (
+    const std::chrono::duration<_Rep, _Period> & intv,
+    const func<_Rp(_Ap...)> & task,
+    const               _Ap & ... args
+) {
+    auto e = new looper(std::forward<const std::chrono::duration<_Rep, _Period>>(intv));
+    e->submit(
+        std::forward<const func<_Rp(_Ap...)>>(task),
+        std::forward<const               _Ap>(args)...
+    );
+    e->start();
+    return e;
+}
+
+/**
+ * @brief 定频执行。
+ * 
+ * @tparam _Rp 
+ * @tparam _Ap 
+ * @param freq 
+ * @param task 
+ * @param args 
+ * @return animator* 
+ * 
+ * @author fomjar
+ * @date 2022/05/02
+ */
+template <typename _Rp, typename ... _Ap>
+inline animator * anim (
+                      float   freq,
+    const func<_Rp(_Ap...)> & task,
+    const               _Ap & ... args
+) {
+    auto e = new animator(freq);
+    e->submit(
+        std::forward<const func<_Rp(_Ap...)>>(task),
+        std::forward<const               _Ap>(args)...
+    );
+    e->start();
+    return e;
+}
 
 
 } // namespace jar
