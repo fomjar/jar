@@ -17,13 +17,11 @@ namespace jar {
 
 
 
-
-template <typename RET, typename ... ARG>
-using func      = std::function<RET(ARG...)>;
-template <typename ... ARG>
-using func_v    = func<void, ARG...>;
-
-using func_vv   = func<void>;
+template <typename _Fp>
+using func      = std::function<_Fp>;
+template <typename ... _Ap>
+using func_v    = func<void(_Ap...)>;
+using func_vv   = func<void(void)>;
 
 
 
@@ -111,30 +109,61 @@ public:
     /**
      * @brief 提交任务。执行方式和时机取决于实现。
      * 
-     * @tparam RET 
-     * @tparam ARG 
+     * @tparam _Rp 
+     * @tparam _Ap 
+     * @param prom 
      * @param task 
      * @param args 
-     * @return std::promise<RET> 
      */
-    template <typename RET, typename ... ARG>
-    std::promise<RET> submit(const func<RET, ARG...> & task, const ARG & ... args) {
-        std::promise<RET> prom;
+    template <typename _Rp, typename ... _Ap>
+    void submit(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
         JAR_EXEC_LOCK_GUARD
-        this->tasks.push_back([=, &prom] { prom.set_value(task(args...)); });
+        this->tasks.push_back([=, &prom] { const_cast<std::promise<_Rp> &>(prom).set_value(task(args...)); });
         this->condition.notify_all();
-        return prom;
     }
     
     /**
      * @brief 提交任务。执行方式和时机取决于实现。
      * 
-     * @tparam ARG 
+     * @tparam _Ap 
+     * @param prom 
      * @param task 
      * @param args 
      */
-    template <typename ... ARG>
-    void submit(const func_v<ARG...> & task, const ARG & ... args) {
+    template <typename ... _Ap>
+    void submit(const std::promise<void> & prom, const func_v<_Ap...> & task, const _Ap & ... args) {
+        JAR_EXEC_LOCK_GUARD
+        this->tasks.push_back([=, &prom] {
+            task(args...);
+            const_cast<std::promise<void> &>(prom).set_value();
+        });
+        this->condition.notify_all();
+    }
+
+    /**
+     * @brief 提交任务。执行方式和时机取决于实现。
+     * 
+     * @tparam _Rp 
+     * @tparam _Ap 
+     * @param task 
+     * @param args 
+     */
+    template <typename _Rp, typename ... _Ap>
+    void submit(const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
+        JAR_EXEC_LOCK_GUARD
+        this->tasks.push_back([=] { task(args...); });
+        this->condition.notify_all();
+    }
+    
+    /**
+     * @brief 提交任务。执行方式和时机取决于实现。
+     * 
+     * @tparam _Ap 
+     * @param task 
+     * @param args 
+     */
+    template <typename ... _Ap>
+    void submit(const func_v<_Ap...> & task, const _Ap & ... args) {
         JAR_EXEC_LOCK_GUARD
         this->tasks.push_back([=] { task(args...); });
         this->condition.notify_all();
@@ -266,7 +295,7 @@ private:
 
 
 /**
- * @brief 动画引擎。以固定频率执行任务，与looper的区别在于，它以绝对的间隔时间来执行任务，因为它将任务的执行时间也计算在内。
+ * @brief 动画引擎。以固定频率执行任务，与looper的区别在于，它以绝对的时间频率来执行任务，因为它将任务的执行时间也计算在内。
  * 
  * @see exec
  * 
@@ -379,27 +408,66 @@ public:
     /**
      * @brief 提交任务。执行方式和时机取决于实现。
      * 
-     * @tparam RET 
-     * @tparam ARG 
+     * @tparam _Rp 
+     * @tparam _Ap 
+     * @param prom 
      * @param task 
      * @param args 
-     * @return std::promise<RET> 
      */
-    template <typename RET, typename ... ARG>
-    std::promise<RET> submit(const func<RET, ARG...> & task, const ARG & ... args) {
-        return this->choose()->submit(task, args...);
+    template <typename _Rp, typename ... _Ap>
+    void submit(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
+        this->choose()->submit(
+            std::forward<const std::promise<_Rp>>(prom),
+            std::forward<const func<_Rp(_Ap...)>>(task),
+            std::forward<const _Ap>(args)...
+        );
     }
     
     /**
      * @brief 提交任务。执行方式和时机取决于实现。
      * 
-     * @tparam ARG 
+     * @tparam _Ap 
+     * @param prom 
      * @param task 
      * @param args 
      */
-    template <typename ... ARG>
-    void submit(const func_v<ARG...> & task, const ARG & ... args) {
-        this->choose()->submit(task, args...);
+    template <typename ... _Ap>
+    void submit(const std::promise<void> & prom, const func_v<_Ap...> & task, const _Ap & ... args) {
+        this->choose()->submit(
+            std::forward<const std::promise<void>>(prom),
+            std::forward<const func_v<_Ap...>>(task),
+            std::forward<const _Ap>(args)...
+        );
+    }
+    /**
+     * @brief 提交任务。执行方式和时机取决于实现。
+     * 
+     * @tparam _Rp 
+     * @tparam _Ap 
+     * @param task 
+     * @param args 
+     */
+    template <typename _Rp, typename ... _Ap>
+    void submit(const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
+        this->choose()->submit(
+            std::forward<const func<_Rp(_Ap...)>>(task),
+            std::forward<const _Ap>(args)...
+        );
+    }
+    
+    /**
+     * @brief 提交任务。执行方式和时机取决于实现。
+     * 
+     * @tparam _Ap 
+     * @param task 
+     * @param args 
+     */
+    template <typename ... _Ap>
+    void submit(const func_v<_Ap...> & task, const _Ap & ... args) {
+        this->choose()->submit(
+            std::forward<const func_v<_Ap...>>(task),
+            std::forward<const _Ap>(args)...
+        );
     }
 
 protected:
@@ -478,6 +546,91 @@ private:
 
 };
 
+
+extern queuer main_queuer;
+
+
+/**
+ * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * 
+ * @tparam _Rp 
+ * @tparam _Ap 
+ * @param prom 
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename _Rp, typename ... _Ap>
+inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
+    if (!main_queuer.is_running()) main_queuer.start();
+    return main_queuer.submit(
+        std::forward<const std::promise<_Rp>>(prom),
+        std::forward<const func<_Rp(_Ap...)>>(task),
+        std::forward<const _Ap>(args)...
+    );
+}
+
+/**
+ * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * 
+ * @tparam _Ap 
+ * @param prom 
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename ... _Ap>
+inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, const _Ap & ... args) {
+    if (!main_queuer.is_running()) main_queuer.start();
+    main_queuer.submit(
+        std::forward<const std::promise<void>>(prom),
+        std::forward<const func_v<_Ap...>>(task),
+        std::forward<const _Ap>(args)...
+    );
+}
+
+/**
+ * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * 
+ * @tparam _Rp 
+ * @tparam _Ap 
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename _Rp, typename ... _Ap>
+inline void async(const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
+    if (!main_queuer.is_running()) main_queuer.start();
+    return main_queuer.submit(
+        std::forward<const func<_Rp(_Ap...)>>(task),
+        std::forward<const _Ap>(args)...
+    );
+}
+
+/**
+ * @brief 异步执行。任务委托主异步队列按顺序执行。
+ * 
+ * @tparam _Ap 
+ * @param task 
+ * @param args 
+ * 
+ * @author fomjar
+ * @date 2022/05/01
+ */
+template <typename ... _Ap>
+inline void async(const func_v<_Ap...> & task, const _Ap & ... args) {
+    if (!main_queuer.is_running()) main_queuer.start();
+    main_queuer.submit(
+        std::forward<const func_v<_Ap...>>(task),
+        std::forward<const _Ap>(args)...
+    );
+}
 
 
 

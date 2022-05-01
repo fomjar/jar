@@ -28,7 +28,7 @@ namespace jar {
  */
 class any {
 
-    using func = std::function<void()>;
+    using func_vv = std::function<void()>;
 
 public:
     any()               { this->set_val(0); }
@@ -76,7 +76,7 @@ private:
 
     const char * t; // type
           void * v; // value
-          func   d; // delete
+       func_vv   d; // delete
 };
 
 

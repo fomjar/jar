@@ -16,6 +16,34 @@ void test_any() {
 
 void test_exec() {
     {
+        std::promise<void> p;
+        jar::async(p, (jar::func_vv) [] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        });
+        p.get_future().wait();
+        std::cout << jar::now2str() << " - " << "async func_vv " << std::endl;
+    }
+    {
+        std::promise<float> p;
+        jar::async(p, (jar::func<float(void)>) [] () -> float {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            return 3.3;
+        });
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "async func<float(void)>: " << c << std::endl;
+    }
+    {
+        float a = 3.3;
+        float b = 3.3;
+        std::promise<float> p;
+        jar::async(p, (jar::func<float(float, float)>) [] (float a, float b) -> float {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            return a * b;
+        }, a, b);
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "async func<float(float, float)>: " << c << std::endl;
+    }
+    {
         jar::queuer e;
         e.start();
         e.submit((jar::func_vv) [] {
@@ -24,12 +52,13 @@ void test_exec() {
         });
         float a = 3.3;
         float b = 3.3;
-        float c = e.submit((jar::func<float, float, float>) [] (float a, float b) -> float {
+        std::promise<float> p;
+        e.submit(p, (jar::func<float(float, float)>) [] (float a, float b) -> float {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             return a * b;
-        }, a, b).get_future().get();
-        std::cout << jar::now2str() << " - " << "queuer func<float, float, float> = " << c << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        }, a, b);
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "queuer func<float(float, float)> = " << c << std::endl;
     }
     {
         jar::delayer e(std::chrono::milliseconds(500));
@@ -38,14 +67,14 @@ void test_exec() {
         });
         float a = 3.3;
         float b = 3.3;
-        auto p = e.submit((jar::func<float, float, float>) [] (float a, float b) -> float {
+        std::promise<float> p;
+        e.submit(p, (jar::func<float(float, float)>) [] (float a, float b) -> float {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             return a * b;
         }, a, b);
         e.start();
-        float d = p.get_future().get();
-        std::cout << jar::now2str() << " - " << "delayer func<float, float, float> = " << d << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+        float c = p.get_future().get();
+        std::cout << jar::now2str() << " - " << "delayer func<float(float, float)> = " << c << std::endl;
     }
     {
         jar::looper e(std::chrono::milliseconds(500));
@@ -89,20 +118,29 @@ void test_pool() {
 }
 
 void test_event() {
-    jar::event_queue<uint32_t>      queue_int;
-    jar::event_queue<std::string>   queue_str;
+    {
+        jar::event_queue<uint32_t>      queue_int;
+        jar::event_queue<std::string>   queue_str;
 
-    queue_int.sub(0x00000001, (jar::func_v<std::string>) [] (std::string str) {
-        std::cout << jar::now2str() << " - " << "int event_queue: " << str << std::endl;
-    });
-    queue_str.sub("0x00000001", (jar::func_v<std::string>) [] (std::string str) {
-        std::cout << jar::now2str() << " - " << "string event_queue: " << str << std::endl;
-    });
+        queue_int.sub(0x00000001, (jar::func_v<std::string>) [] (std::string str) {
+            std::cout << jar::now2str() << " - " << "int event_queue: " << str << std::endl;
+        });
+        queue_str.sub("0x00000001", (jar::func_v<std::string>) [] (std::string str) {
+            std::cout << jar::now2str() << " - " << "string event_queue: " << str << std::endl;
+        });
 
-    queue_int.pub(0x00000001, std::string("Hello World!"));
-    queue_str.pub("0x00000001", std::string("Hello World!"));
+        queue_int.pub(0x00000001, std::string("Hello World!"));
+        queue_str.pub("0x00000001", std::string("Hello World!"));
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    {
+        jar::sub(0x0000000000000001LL, (jar::func_vv) [] {
+            std::cout << jar::now2str() << " - " << "main_event_queue" << std::endl;
+        });
+        jar::pub(0x0000000000000001LL);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 }
 
 int main() {

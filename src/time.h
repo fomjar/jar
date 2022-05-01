@@ -11,6 +11,9 @@ namespace jar {
  * @brief 从1970/01/01 00:00:00到当前时间为止经过的时间，单位：微秒。
  * 
  * @return long long 
+ * 
+ * @author fomjar
+ * @date 2022/04/30
  */
 inline long long now() {
     return std::chrono::system_clock::now().time_since_epoch().count();
@@ -19,8 +22,11 @@ inline long long now() {
 /**
  * @brief 格式化当前时间。
  * 
- * @param format YYYY: 年, MM: 月, DD: 日, hh: 时, mm: 分, ss: 秒, SSSSSS: 微秒, SSS: 毫秒
+ * @param format YYYY: 年, MM: 月, DD: 日, hh: 时, mm: 分, ss: 秒, SSS: 毫秒, SSSSSS: 微秒
  * @return std::string 
+ * 
+ * @author fomjar
+ * @date 2022/04/30
  */
 inline std::string now2str(const std::string & format = "YYYY/MM/DD hh:mm:ss.SSSSSS") {
     auto tp = std::chrono::system_clock::now();
