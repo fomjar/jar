@@ -186,11 +186,11 @@ void test_event() {
 }
 
 int main() {
-    // test_any();
-    // test_exec();
-    // test_pool();
+    test_any();
+    test_exec();
+    test_pool();
     test_main_pool();
-    // test_event();
+    test_event();
 
     std::cout << "Hello World!" << std::endl;
 
