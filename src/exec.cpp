@@ -9,7 +9,7 @@ uint32_t delayer::name_idx = 0;
 uint32_t looper::name_idx = 0;
 uint32_t animator::name_idx = 0;
 
-cached_pool main_pool(0);
+cached_pool pool(0);
 
 }
 

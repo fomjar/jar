@@ -1,3 +1,13 @@
+/**
+ * @file exec.h
+ * @author fomjar (fomjar@gmail.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-04-30
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 
 #ifndef _JAR_EXEC_H
 #define _JAR_EXEC_H
@@ -494,18 +504,18 @@ protected:
     std::mutex          mutex;
 };
 
-using pool = executor_pool;
+using exec_pool = executor_pool;
 
 
 /**
  * @brief 固定大小的线程池实现。当没有空闲线程时，任务将派发给任务数量最少的线程，排队等待执行。
  * 
- * @see pool
+ * @see exec_pool
  * 
  * @author fomjar
  * @date 2022/04/30
  */
-class fixed_pool : public pool {
+class fixed_pool : public exec_pool {
 
 public:
     fixed_pool(size_t fixed_size = 4) {
@@ -531,12 +541,12 @@ protected:
 /**
  * @brief 缓冲大小的线程池实现。当没有空闲线程时自动创建新线程，当线程空闲超过1分钟时会自动释放，但至少会保留指定数量的线程。
  * 
- * @see pool
+ * @see exec_pool
  * 
  * @author fomjar
  * @date 2022/04/30
  */
-class cached_pool : public pool {
+class cached_pool : public exec_pool {
 
 public:
     cached_pool(size_t cached_size = 4) :
@@ -564,7 +574,7 @@ private:
 };
 
 
-extern cached_pool main_pool;
+extern cached_pool pool;
 
 
 /**
@@ -581,7 +591,7 @@ extern cached_pool main_pool;
  */
 template <typename _Rp, typename ... _Ap>
 inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
-    main_pool.submit(
+    pool.submit(
         std::forward<const std::promise<_Rp>>(prom),
         std::forward<const func<_Rp(_Ap...)>>(task),
         std::forward<const _Ap>(args)...
@@ -601,7 +611,7 @@ inline void async(const std::promise<_Rp> & prom, const func<_Rp(_Ap...)> & task
  */
 template <typename ... _Ap>
 inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, const _Ap & ... args) {
-    main_pool.submit(
+    pool.submit(
         std::forward<const std::promise<void>>(prom),
         std::forward<const func_v<_Ap...>>(task),
         std::forward<const _Ap>(args)...
@@ -621,7 +631,7 @@ inline void async(const std::promise<void> & prom, const func_v<_Ap...> & task, 
  */
 template <typename _Rp, typename ... _Ap>
 inline void async(const func<_Rp(_Ap...)> & task, const _Ap & ... args) {
-    main_pool.submit(
+    pool.submit(
         std::forward<const func<_Rp(_Ap...)>>(task),
         std::forward<const _Ap>(args)...
     );
@@ -649,7 +659,7 @@ inline void delay(
     const func<_Rp(_Ap...)> & task,
     const               _Ap & ... args
 ) {
-    main_pool.submit((func_vv) [&] {
+    pool.submit((func_vv) [&] {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const std::promise<_Rp>>(prom),
@@ -682,7 +692,7 @@ inline void delay(
     const     func_v<_Ap...> & task,
     const                _Ap & ... args
 ) {
-    main_pool.submit((func_vv) [&] {
+    pool.submit((func_vv) [&] {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const std::promise<void>>(prom),
@@ -714,7 +724,7 @@ inline void delay(
     const func<_Rp(_Ap...)> & task,
     const               _Ap & ... args
 ) {
-    main_pool.submit((func_vv) [&] () {
+    pool.submit((func_vv) [&] () {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const func<_Rp(_Ap...)>>(task),

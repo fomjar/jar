@@ -1,4 +1,13 @@
-
+/**
+ * @file event.h
+ * @author fomjar (fomjar@gmail.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-04-30
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 
 #ifndef _JAR_EVENT_H
 #define _JAR_EVENT_H
@@ -62,37 +71,37 @@ private:
 
 
 
-extern event_queue<uint64_t> main_event_queue;
+extern event_queue<uint64_t> event;
 
 
 /**
  * @brief 订阅一个事件。从主事件队列。
  * 
  * @tparam _Ap 
- * @param event 
- * @param callback 
+ * @param e 
+ * @param func 
  * 
  * @author fomjar
  * @date 2022/04/30
  */
 template <typename ... _Ap>
-inline void sub(const uint64_t & event, const func_v<_Ap...> & callback) {
-    main_event_queue.sub(std::forward<const uint64_t>(event), std::forward<const func_v<_Ap...>>(callback));
+inline void sub(const uint64_t & e, const func_v<_Ap...> & func) {
+    event.sub(std::forward<const uint64_t>(e), std::forward<const func_v<_Ap...>>(func));
 }
 
 /**
  * @brief 发布一个事件。到主事件队列。
  * 
  * @tparam _Ap 
- * @param event 
+ * @param e 
  * @param args 
  * 
  * @author fomjar
  * @date 2022/04/30
  */
 template <typename ... _Ap>
-inline void pub(const uint64_t & event, const _Ap & ... args) {
-    main_event_queue.pub(std::forward<const uint64_t>(event), std::forward<const _Ap>(args)...);
+inline void pub(const uint64_t & e, const _Ap & ... args) {
+    event.pub(std::forward<const uint64_t>(e), std::forward<const _Ap>(args)...);
 }
 
 
