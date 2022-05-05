@@ -4,9 +4,9 @@ project(jar VERSION 0.1.0)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 11)
 
-file(GLOB_RECURSE SRCS "jar/*.cpp" "jar/*.c")
+file(GLOB_RECURSE SRCS "jar/*.cpp" "jar/*.hpp" "jar/*.c")
 message("SRCS=${SRCS}")
-file(GLOB_RECURSE INCS "jar/*.hpp" "jar/*.h")
+file(GLOB_RECURSE INCS "jar/*.h")
 message("INCS=${INCS}")
 
 include_directories(".")
