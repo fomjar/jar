@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.0.0)
 project(jar VERSION 0.1.0)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_STANDARD 11)
 
-file(GLOB_RECURSE SRCS "include/*.cpp" "include/*.c")
+file(GLOB_RECURSE SRCS "jar/*.cpp" "jar/*.c")
 message("SRCS=${SRCS}")
-file(GLOB_RECURSE INCS "include/*.hpp" "include/*.h")
+file(GLOB_RECURSE INCS "jar/*.hpp" "jar/*.h")
 message("INCS=${INCS}")
 
-# include_directories("include")
+include_directories(".")
 
 # lib
 set(LIBRARY_OUTPUT_PATH "../lib")
