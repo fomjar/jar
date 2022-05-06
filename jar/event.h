@@ -33,8 +33,8 @@ template <typename _Tp>
 class event_queue {
 
 public:
-    event_queue() : callbacks(), mutex(), queuer() {
-        this->queuer.start();
+    event_queue() : callbacks(), mutex(), quer() {
+        this->quer.start();
     }
 
 public:
@@ -51,7 +51,7 @@ public:
 
     template <typename ... _Ap>
     void pub(const _Tp & event, const _Ap & ... args) {
-        this->queuer.submit((func_vv) [this, event, args...] {
+        this->quer.submit((func_vv) [this, event, args...] {
             JAR_EXEC_LOCK_GUARD
             for (auto a : this->callbacks[event]) {
                 auto callback = a.template cast<func_v<_Ap...>>();
@@ -64,7 +64,7 @@ public:
 private:
     std::map<_Tp, std::vector<any>> callbacks;
     std::mutex  mutex;
-    queuer      queuer;
+    queuer      quer;
 
 };
 
