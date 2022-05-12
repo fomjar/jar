@@ -659,7 +659,7 @@ inline void delay(
     const func<_Rp(_Ap...)> & task,
     const               _Ap & ... args
 ) {
-    pool.submit((func_vv) [&] {
+    pool.submit((func_vv) [=, &prom] {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const std::promise<_Rp>>(prom),
@@ -692,7 +692,7 @@ inline void delay(
     const     func_v<_Ap...> & task,
     const                _Ap & ... args
 ) {
-    pool.submit((func_vv) [&] {
+    pool.submit((func_vv) [=, &prom] {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const std::promise<void>>(prom),
@@ -724,7 +724,7 @@ inline void delay(
     const func<_Rp(_Ap...)> & task,
     const               _Ap & ... args
 ) {
-    pool.submit((func_vv) [&] () {
+    pool.submit((func_vv) [=] () {
         delayer e(std::forward<const std::chrono::duration<_Rep, _Period>>(dura));
         e.submit(
             std::forward<const func<_Rp(_Ap...)>>(task),

@@ -10,6 +10,7 @@ file(GLOB_RECURSE INCS "jar/*.h")
 message("INCS=${INCS}")
 
 include_directories(".")
+link_libraries("pthread")
 
 # lib
 set(LIBRARY_OUTPUT_PATH "../lib")
